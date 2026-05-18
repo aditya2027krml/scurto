@@ -20,11 +20,26 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 def health():
     return {"status": "ok"}
 
-
 @app.get("/")
 def serve_frontend():
     return FileResponse("static/index.html")
 
+@app.get("/stats/global")
+def global_stats(db: Session = Depends(get_db)):
+    from sqlalchemy import func
+    total_urls   = db.query(func.count(models.Url.short_code)).scalar()
+    total_clicks = db.query(func.sum(models.Url.click_count)).scalar()
+    return {
+        "total_urls":   total_urls   or 0,
+        "total_clicks": total_clicks or 0,
+    }
+
+@app.get("/stats/{short_code}", response_model=schemas.StatsResponse)
+def get_stats(short_code: str, db: Session = Depends(get_db)):
+    url = crud.get_url_by_code(db, short_code)
+    if not url:
+        raise HTTPException(status_code=404, detail="Short URL not found")
+    return url
 
 @app.post("/shorten", response_model=schemas.ShortenResponse, status_code=201)
 def shorten_url(request: schemas.ShortenRequest, db: Session = Depends(get_db)):
@@ -37,15 +52,6 @@ def shorten_url(request: schemas.ShortenRequest, db: Session = Depends(get_db)):
         created_at = url.created_at,
     )
 
-
-@app.get("/stats/{short_code}", response_model=schemas.StatsResponse)
-def get_stats(short_code: str, db: Session = Depends(get_db)):
-    url = crud.get_url_by_code(db, short_code)
-    if not url:
-        raise HTTPException(status_code=404, detail="Short URL not found")
-    return url
-
-
 @app.get("/{short_code}")
 def redirect_url(short_code: str, db: Session = Depends(get_db)):
     url = crud.get_url_by_code(db, short_code)
@@ -53,16 +59,6 @@ def redirect_url(short_code: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Short URL not found")
     crud.increment_click(db, url)
     return RedirectResponse(url=url.long_url, status_code=302)
-
-@app.get("/stats/global")
-def global_stats(db: Session = Depends(get_db)):
-    from sqlalchemy import func
-    total_urls   = db.query(func.count(models.Url.short_code)).scalar()
-    total_clicks = db.query(func.sum(models.Url.click_count)).scalar()
-    return {
-        "total_urls":   total_urls   or 0,
-        "total_clicks": total_clicks or 0,
-    }
 
 
 
