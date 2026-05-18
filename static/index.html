@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Scurto — Short links, big impact</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0f0f13;color:#e8e6f0;min-height:100vh;padding:32px 16px}
+    .page{max-width:640px;margin:0 auto}
+
+    .hero{text-align:center;margin-bottom:40px;padding-top:16px}
+    .logo{display:inline-flex;align-items:center;gap:10px;margin-bottom:20px}
+    .logo-icon{width:40px;height:40px;background:#6366f1;border-radius:10px;display:flex;align-items:center;justify-content:center}
+    .logo-icon svg{width:22px;height:22px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .logo-text{font-size:22px;font-weight:800;color:#e8e6f0;letter-spacing:-0.5px}
+    .logo-tld{color:#6366f1}
+    h1{font-size:36px;font-weight:800;line-height:1.15;margin-bottom:10px;background:linear-gradient(135deg,#e8e6f0 0%,#a5b4fc 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    .hero p{font-size:15px;color:#7c7a8a}
+
+    .stats-bar{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:28px}
+    .stat-pill{background:#1a1a24;border:0.5px solid #2a2a38;border-radius:12px;padding:14px 16px;text-align:center}
+    .stat-pill .val{font-size:22px;font-weight:700;color:#a5b4fc}
+    .stat-pill .lbl{font-size:12px;color:#7c7a8a;margin-top:2px}
+
+    .card{background:#1a1a24;border:0.5px solid #2a2a38;border-radius:16px;padding:24px;margin-bottom:16px}
+
+    .input-wrap{position:relative;margin-bottom:10px}
+    .url-input{width:100%;background:#0f0f13;border:1.5px solid #2a2a38;border-radius:10px;padding:14px 16px;font-size:14px;color:#e8e6f0;outline:none;transition:border-color .2s}
+    .url-input:focus{border-color:#6366f1}
+    .url-input::placeholder{color:#45434f}
+    .char-count{position:absolute;right:12px;bottom:14px;font-size:11px;color:#45434f;pointer-events:none}
+    .enter-hint{font-size:11px;color:#45434f;margin-bottom:10px;padding-left:2px}
+    .enter-hint kbd{background:#1e1e2a;border:0.5px solid #2a2a38;border-radius:4px;padding:1px 5px;font-size:10px;color:#7c7a8a;font-family:inherit}
+
+    /* URL Preview Card */
+    .preview-card{display:none;align-items:center;gap:10px;background:#0f0f13;border:0.5px solid #2a2a38;border-radius:10px;padding:10px 14px;margin-bottom:10px;animation:fadeIn .2s ease}
+    .preview-favicon{width:20px;height:20px;border-radius:4px;flex-shrink:0;object-fit:contain}
+    .preview-favicon-placeholder{width:20px;height:20px;border-radius:4px;background:#2a2a38;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+    .preview-favicon-placeholder svg{width:12px;height:12px;stroke:#45434f;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .preview-text{flex:1;min-width:0}
+    .preview-label{font-size:10px;color:#45434f;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
+    .preview-domain{font-size:13px;font-weight:500;color:#a5b4fc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .preview-path{font-size:11px;color:#7c7a8a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .preview-valid{width:18px;height:18px;flex-shrink:0}
+    .preview-valid svg{width:18px;height:18px;stroke:#4ade80;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+    .shorten-btn{width:100%;padding:14px;background:#6366f1;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:background .2s;display:flex;align-items:center;justify-content:center;gap:8px}
+    .shorten-btn:hover{background:#4f46e5}
+    .shorten-btn:disabled{background:#3b3b6b;cursor:not-allowed}
+    .shorten-btn svg{width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+    .error-box{display:none;margin-top:12px;padding:12px 16px;background:#2a1a1a;border:1px solid #7f1d1d;border-radius:10px;font-size:13px;color:#fca5a5}
+
+    .result-card{display:none;background:#0f0f13;border:1.5px solid #6366f1;border-radius:12px;padding:18px;margin-top:16px;animation:fadeIn .3s ease}
+    .result-label{font-size:11px;font-weight:600;color:#6366f1;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+    .result-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .result-url{font-size:17px;font-weight:700;color:#a5b4fc;flex:1;word-break:break-all;text-decoration:none;min-width:0}
+    .result-url:hover{text-decoration:underline}
+
+    .action-btns{display:flex;gap:8px;flex-shrink:0}
+
+    /* Copy button with animation */
+    .copy-btn{background:#6366f1;color:#fff;border:none;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:5px;transition:background .2s,transform .1s;white-space:nowrap}
+    .copy-btn:hover{background:#4f46e5}
+    .copy-btn:active{transform:scale(.96)}
+    .copy-btn svg{width:14px;height:14px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:all .2s}
+    .copy-btn.copied{background:#16a34a}
+    .copy-btn.copied svg{stroke:#fff}
+
+    /* Share button */
+    .share-btn{background:#1e1e2a;color:#a5b4fc;border:0.5px solid #2a2a38;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .2s;white-space:nowrap}
+    .share-btn:hover{background:#2a2a38;border-color:#6366f1}
+    .share-btn svg{width:14px;height:14px;stroke:#a5b4fc;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+    .result-meta{display:flex;gap:24px;margin-top:14px;padding-top:14px;border-top:0.5px solid #2a2a38}
+    .meta-item{display:flex;flex-direction:column;gap:2px}
+    .meta-val{font-size:20px;font-weight:700;color:#e8e6f0}
+    .meta-lbl{font-size:11px;color:#7c7a8a}
+
+    .qr-area{display:flex;gap:16px;align-items:center;padding:14px;background:#13131e;border-radius:10px;margin-top:14px;border:0.5px solid #2a2a38}
+    #qr-container{width:80px;height:80px;flex-shrink:0;border-radius:6px;overflow:hidden;background:#fff;display:flex;align-items:center;justify-content:center}
+    #qr-container img,#qr-container canvas{width:80px !important;height:80px !important}
+    .qr-info p{font-size:13px;color:#7c7a8a;line-height:1.6}
+    .qr-info strong{color:#e8e6f0;font-weight:500;display:block;margin-bottom:4px}
+    .dl-btn{margin-top:8px;background:none;border:0.5px solid #2a2a38;border-radius:6px;padding:5px 12px;font-size:12px;color:#7c7a8a;cursor:pointer;transition:all .2s}
+    .dl-btn:hover{border-color:#6366f1;color:#a5b4fc}
+
+    .section-title{font-size:12px;font-weight:600;color:#7c7a8a;text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px}
+    .history-empty{font-size:13px;color:#45434f;text-align:center;padding:16px 0}
+    .history-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:0.5px solid #1e1e2a}
+    .history-row:last-child{border-bottom:none}
+    .h-short{font-size:13px;font-weight:600;color:#a5b4fc;min-width:80px;white-space:nowrap}
+    .h-long{font-size:12px;color:#7c7a8a;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .h-clicks{font-size:12px;color:#45434f;white-space:nowrap;min-width:55px;text-align:right}
+    .stats-btn{background:none;border:0.5px solid #2a2a38;border-radius:6px;padding:4px 10px;font-size:11px;color:#7c7a8a;cursor:pointer;white-space:nowrap;transition:all .2s}
+    .stats-btn:hover{border-color:#6366f1;color:#a5b4fc}
+
+    .stats-modal{display:none;background:#13131e;border:0.5px solid #2a2a38;border-radius:12px;padding:16px;margin-top:8px;margin-bottom:4px;animation:fadeIn .2s ease}
+    .stats-row{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:0.5px solid #1e1e2a;gap:12px}
+    .stats-row:last-child{border-bottom:none}
+    .stats-row .k{color:#7c7a8a;flex-shrink:0}
+    .stats-row .v{color:#e8e6f0;font-weight:500;word-break:break-all;text-align:right}
+
+    /* Toast notification */
+    .toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(20px);background:#1e1e2a;border:0.5px solid #2a2a38;border-radius:10px;padding:12px 20px;font-size:13px;color:#e8e6f0;display:flex;align-items:center;gap:8px;opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);pointer-events:none;z-index:999;white-space:nowrap;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+    .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+    .toast svg{width:16px;height:16px;stroke:#4ade80;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+
+    .footer{text-align:center;margin-top:32px;font-size:12px;color:#45434f;padding-bottom:24px}
+    .footer a{color:#6366f1;text-decoration:none}
+    .footer a:hover{text-decoration:underline}
+
+    @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+    .loading{animation:pulse 1s infinite}
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <div class="hero">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+      </div>
+      <span class="logo-text">Scurto<span class="logo-tld">.app</span></span>
+    </div>
+    <h1>Short links.<br>Big impact.</h1>
+    <p>Paste a long URL, get a clean short link with real-time click analytics.</p>
+  </div>
+
+  <div class="stats-bar">
+    <div class="stat-pill"><div class="val" id="total-urls">—</div><div class="lbl">URLs shortened</div></div>
+    <div class="stat-pill"><div class="val" id="total-clicks">—</div><div class="lbl">Total clicks</div></div>
+    <div class="stat-pill"><div class="val">99.9%</div><div class="lbl">Uptime</div></div>
+  </div>
+
+  <div class="card">
+    <div class="input-wrap">
+      <input class="url-input" id="longUrl" type="url"
+        placeholder="Paste your long URL here..."
+        maxlength="2048"
+        oninput="handleInput(this)"
+      />
+      <span class="char-count" id="cc">0 / 2048</span>
+    </div>
+
+    <!-- URL Preview Card -->
+    <div class="preview-card" id="previewCard">
+      <div class="preview-favicon-placeholder" id="faviconWrap">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      </div>
+      <div class="preview-text">
+        <div class="preview-label">Shortening</div>
+        <div class="preview-domain" id="previewDomain">—</div>
+        <div class="preview-path" id="previewPath"></div>
+      </div>
+      <div class="preview-valid">
+        <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      </div>
+    </div>
+
+    <p class="enter-hint">Press <kbd>Enter ↵</kbd> to shorten</p>
+
+    <button class="shorten-btn" id="shortenBtn" onclick="shortenUrl()">
+      <svg viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+      <span id="btn-text">Shorten URL</span>
+    </button>
+    <div class="error-box" id="errorBox"></div>
+
+    <div class="result-card" id="resultCard">
+      <div class="result-label">Your Scurto link is ready</div>
+      <div class="result-row">
+        <a class="result-url" id="resultUrl" href="#" target="_blank"></a>
+        <div class="action-btns">
+          <button class="copy-btn" id="copyBtn" onclick="copyUrl()">
+            <svg id="copyIcon" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            <span id="copyText">Copy</span>
+          </button>
+          <button class="share-btn" id="shareBtn" onclick="shareUrl()" style="display:none">
+            <svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+            Share
+          </button>
+        </div>
+      </div>
+      <div class="result-meta">
+        <div class="meta-item"><span class="meta-val" id="resClicks">0</span><span class="meta-lbl">Clicks</span></div>
+        <div class="meta-item"><span class="meta-val" id="resDate">—</span><span class="meta-lbl">Created</span></div>
+        <div class="meta-item"><span class="meta-val" id="resCode">—</span><span class="meta-lbl">Short code</span></div>
+      </div>
+      <div class="qr-area">
+        <div id="qr-container"></div>
+        <div class="qr-info">
+          <p><strong>Scan to open</strong>Real QR code — works with any phone camera. Share for offline or print use.</p>
+          <button class="dl-btn" onclick="downloadQR()">Download QR</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">Recent links</div>
+    <div id="historyList">
+      <div class="history-empty">No links shortened yet in this session.</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Built with FastAPI &amp; Python &nbsp;·&nbsp;
+    <a href="/docs" target="_blank">API docs</a>
+    &nbsp;·&nbsp; Scurto.app
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast">
+  <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+  <span id="toastMsg">Copied to clipboard!</span>
+</div>
+
+<script>
+const BASE = window.location.origin;
+let currentShortUrl = "";
+let currentCode = "";
+let sessionHistory = [];
+let totalUrls = 0;
+let totalClicks = 0;
+let previewDebounce = null;
+
+/* ── Input handler: char count + preview ── */
+function handleInput(el){
+  document.getElementById('cc').textContent = el.value.length + ' / 2048';
+  clearTimeout(previewDebounce);
+  const val = el.value.trim();
+  if(!val){ hidePreview(); return; }
+  previewDebounce = setTimeout(() => showPreview(val), 400);
+}
+
+function showPreview(url){
+  try{
+    const u = new URL(url);
+    if(!['http:','https:'].includes(u.protocol)){ hidePreview(); return; }
+
+    const domain   = u.hostname;
+    const path     = u.pathname + u.search;
+    const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+
+    document.getElementById('previewDomain').textContent = domain;
+    document.getElementById('previewPath').textContent   = path.length > 1 ? path : '';
+
+    const wrap = document.getElementById('faviconWrap');
+    wrap.innerHTML = `<img class="preview-favicon" src="${faviconUrl}"
+      onerror="this.style.display='none'"
+      onload="this.style.display='block'" style="display:none"/>
+      <svg style="display:block" viewBox="0 0 24 24" width="12" height="12"
+        fill="none" stroke="#45434f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+      </svg>`;
+
+    const img = wrap.querySelector('img');
+    const placeholder = wrap.querySelector('svg');
+    img.onload  = () => { img.style.display='block'; placeholder.style.display='none'; };
+    img.onerror = () => { img.style.display='none';  placeholder.style.display='block'; };
+
+    document.getElementById('previewCard').style.display = 'flex';
+  }catch(e){
+    hidePreview();
+  }
+}
+
+function hidePreview(){
+  document.getElementById('previewCard').style.display = 'none';
+}
+
+/* ── Shorten ── */
+async function shortenUrl(){
+  const input  = document.getElementById('longUrl').value.trim();
+  const btn    = document.getElementById('shortenBtn');
+  const btnTxt = document.getElementById('btn-text');
+  const err    = document.getElementById('errorBox');
+
+  err.style.display = 'none';
+  if(!input){ showError('Please paste a URL first.'); return; }
+  if(!input.startsWith('http')){ showError('URL must start with http:// or https://'); return; }
+
+  btn.disabled = true;
+  btnTxt.textContent = 'Shortening...';
+  btn.classList.add('loading');
+
+  try{
+    const r = await fetch(`${BASE}/shorten`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({long_url: input})
+    });
+    const data = await r.json();
+    if(!r.ok){ showError(data.detail || 'Something went wrong.'); return; }
+
+    currentShortUrl = data.short_url;
+    currentCode     = data.short_code;
+
+    document.getElementById('resultUrl').href        = data.short_url;
+    document.getElementById('resultUrl').textContent = data.short_url;
+    document.getElementById('resClicks').textContent = data.click_count ?? 0;
+    document.getElementById('resDate').textContent   = new Date(data.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+    document.getElementById('resCode').textContent   = data.short_code;
+    document.getElementById('resultCard').style.display = 'block';
+
+    // Show share button only if Web Share API is available (mobile)
+    document.getElementById('shareBtn').style.display =
+      navigator.share ? 'flex' : 'none';
+
+    generateQR(data.short_url);
+    addToHistory(data, input);
+    totalUrls++;
+    updateStatsBar();
+    hidePreview();
+
+  }catch(e){
+    showError('Could not reach the server. Is it running?');
+  }finally{
+    btn.disabled = false;
+    btnTxt.textContent = 'Shorten URL';
+    btn.classList.remove('loading');
+  }
+}
+
+/* ── QR ── */
+function generateQR(url){
+  const container = document.getElementById('qr-container');
+  container.innerHTML = '';
+  new QRCode(container,{
+    text: url, width:80, height:80,
+    colorDark:'#000000', colorLight:'#ffffff',
+    correctLevel: QRCode.CorrectLevel.H
+  });
+}
+
+function downloadQR(){
+  const container = document.getElementById('qr-container');
+  const canvas = container.querySelector('canvas');
+  const img    = container.querySelector('img');
+  const link   = document.createElement('a');
+  link.download = `scurto-qr-${currentCode}.png`;
+  link.href = canvas ? canvas.toDataURL('image/png') : img.src;
+  link.click();
+}
+
+/* ── Copy with toast animation ── */
+function copyUrl(){
+  navigator.clipboard.writeText(currentShortUrl).then(()=>{
+    const btn  = document.getElementById('copyBtn');
+    const icon = document.getElementById('copyIcon');
+    const text = document.getElementById('copyText');
+
+    // Button turns green
+    btn.classList.add('copied');
+    icon.innerHTML = '<polyline points="20 6 9 17 4 12"/>';
+    text.textContent = 'Copied!';
+
+    // Toast pops up
+    showToast('Copied to clipboard!');
+
+    // Reset after 2s
+    setTimeout(()=>{
+      btn.classList.remove('copied');
+      icon.innerHTML = '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>';
+      text.textContent = 'Copy';
+    }, 2000);
+  });
+}
+
+/* ── Share (Web Share API) ── */
+async function shareUrl(){
+  try{
+    await navigator.share({
+      title: 'Scurto — Short link',
+      text:  'Check this out:',
+      url:   currentShortUrl
+    });
+    showToast('Shared successfully!');
+  }catch(e){
+    if(e.name !== 'AbortError') showToast('Could not open share sheet.');
+  }
+}
+
+/* ── Toast ── */
+let toastTimer = null;
+function showToast(msg){
+  const toast = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> toast.classList.remove('show'), 2500);
+}
+
+/* ── History ── */
+function addToHistory(data, longUrl){
+  if(sessionHistory.find(h => h.code === data.short_code)) return;
+  sessionHistory.unshift({code:data.short_code, short:data.short_url, long:longUrl, clicks:data.click_count??0});
+  if(sessionHistory.length > 5) sessionHistory.pop();
+  renderHistory();
+}
+
+function renderHistory(){
+  const list = document.getElementById('historyList');
+  if(!sessionHistory.length){
+    list.innerHTML='<div class="history-empty">No links shortened yet in this session.</div>';
+    return;
+  }
+  list.innerHTML = sessionHistory.map((h,i)=>`
+    <div class="history-row">
+      <span class="h-short">${h.code}</span>
+      <span class="h-long" title="${h.long}">${h.long}</span>
+      <span class="h-clicks">${h.clicks} clicks</span>
+      <button class="stats-btn" onclick="toggleStats(${i})">Stats</button>
+    </div>
+    <div class="stats-modal" id="modal-${i}">
+      <div class="stats-row"><span class="k">Short URL</span><span class="v">${h.short}</span></div>
+      <div class="stats-row"><span class="k">Long URL</span><span class="v">${h.long}</span></div>
+      <div class="stats-row"><span class="k">Live clicks</span><span class="v" id="live-${i}">${h.clicks}</span></div>
+    </div>
+  `).join('');
+}
+
+async function toggleStats(i){
+  const modal  = document.getElementById(`modal-${i}`);
+  const isOpen = modal.style.display === 'block';
+  document.querySelectorAll('.stats-modal').forEach(m=>m.style.display='none');
+  if(isOpen) return;
+  modal.style.display = 'block';
+  try{
+    const r = await fetch(`${BASE}/stats/${sessionHistory[i].code}`);
+    const d = await r.json();
+    if(r.ok){
+      document.getElementById(`live-${i}`).textContent = d.click_count;
+      sessionHistory[i].clicks = d.click_count;
+      totalClicks = sessionHistory.reduce((s,h)=>s+h.clicks,0);
+      updateStatsBar();
+    }
+  }catch(e){}
+}
+
+function updateStatsBar(){
+  document.getElementById('total-urls').textContent   = totalUrls.toLocaleString();
+  document.getElementById('total-clicks').textContent = totalClicks.toLocaleString();
+}
+
+function showError(msg){
+  const b = document.getElementById('errorBox');
+  b.textContent   = msg;
+  b.style.display = 'block';
+}
+
+document.getElementById('longUrl').addEventListener('keydown', e=>{
+  if(e.key==='Enter') shortenUrl();
+});
+</script>
+</body>
+</html>
