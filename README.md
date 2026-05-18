@@ -49,23 +49,43 @@ At 1,000 URLs/second, this covers **111 years** of traffic.
 - On every write, we check `WHERE long_url_hash = md5(input)` before inserting
 - Avoids full-text scanning a potentially large URL column
 
-### Architecture
+## Architecture
 
-Client
-│
-▼
-Load Balancer (Render)
-│
-▼
-FastAPI Web Server
-├── POST /shorten → UUID4 → Base62 → Store in DB → Return short URL
-└── GET /{code} → Lookup DB → Increment click → HTTP 302 Redirect
-│
-▼
-PostgreSQL (Render)
-└── urls table: short_code (PK), long_url, long_url_hash, click_count, created_at
-
----
+```
+┌─────────────────────────────────────────────┐
+│                   Client                    │
+└─────────────────────┬───────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────┐
+│            Load Balancer (Render)           │
+└─────────────────────┬───────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────┐
+│           FastAPI Web Server                │
+│                                             │
+│  POST /shorten                              │
+│    └─▶ UUID4 → Base62 → DB Insert          │
+│          └─▶ Return short URL              │
+│                                             │
+│  GET /{code}                                │
+│    └─▶ DB Lookup → Increment Click         │
+│          └─▶ HTTP 302 Redirect             │
+└─────────────────────┬───────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────┐
+│            PostgreSQL (Render)              │
+│                                             │
+│  urls                                       │
+│  ├── short_code    VARCHAR(7)  PRIMARY KEY  │
+│  ├── long_url      TEXT                     │
+│  ├── long_url_hash VARCHAR(32) INDEX        │
+│  ├── click_count   BIGINT                   │
+│  └── created_at    TIMESTAMP                │
+└─────────────────────────────────────────────┘
+```
 
 ## Tech Stack
 
@@ -132,21 +152,24 @@ Returns analytics for a short URL.
 
 ## Project Structure
 
+```
 scurto/
+│
 ├── app/
-│ ├── main.py ← FastAPI app, routes
-│ ├── models.py ← SQLAlchemy models
-│ ├── schemas.py ← Pydantic request/response models
-│ ├── crud.py ← Database operations
-│ ├── database.py ← DB connection, session management
-│ └── utils.py ← Base62 encoder, UUID ID generator
+│   ├── main.py          ← FastAPI app & all routes
+│   ├── models.py        ← SQLAlchemy DB models
+│   ├── schemas.py       ← Pydantic request/response shapes
+│   ├── crud.py          ← All DB read/write operations
+│   ├── database.py      ← Connection & session management
+│   └── utils.py         ← Base62 encoder, UUID ID generator
+│
 ├── static/
-│ └── index.html ← Frontend UI
-├── Dockerfile
-├── requirements.txt
-└── README.md
-
----
+│   └── index.html       ← Full frontend UI (dark theme)
+│
+├── Dockerfile           ← Container config for Render
+├── requirements.txt     ← Only 6 dependencies
+└── README.md            ← You are here
+```
 
 ## Run Locally
 
