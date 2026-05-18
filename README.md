@@ -87,6 +87,123 @@ At 1,000 URLs/second, this covers **111 years** of traffic.
 └─────────────────────────────────────────────┘
 ```
 
+## Complete Request Workflow
+
+```
+╔═══════════════════════════════════════════════════════════════════╗
+║                    SCURTO — REQUEST LIFECYCLE                     ║
+╠═══════════════════════════════════════════════════════════════════╣
+║                                                                   ║
+║   ┌─────────┐                                                     ║
+║   │  USER   │                                                     ║
+║   └────┬────┘                                                     ║
+║        │                                                          ║
+║        │  ① Pastes long URL into UI                              ║
+║        ▼                                                          ║
+║   ┌─────────────────────────────────────────────────────────┐    ║
+║   │                  FRONTEND (index.html)                  │    ║
+║   │  • Shows URL preview card (favicon + domain)            │    ║
+║   │  • Validates URL starts with http/https                 │    ║
+║   │  • Sends POST /shorten with { long_url }                │    ║
+║   └────────────────────────┬────────────────────────────────┘    ║
+║                            │                                      ║
+║        ② POST /shorten     │                                      ║
+║                            ▼                                      ║
+║   ┌─────────────────────────────────────────────────────────┐    ║
+║   │               FASTAPI — /shorten endpoint               │    ║
+║   │                                                         │    ║
+║   │  • Pydantic validates URL format                        │    ║
+║   │  • Compute MD5(long_url) → url_hash                     │    ║
+║   │  • Query DB: does url_hash already exist?               │    ║
+║   │                                                         │    ║
+║   │      YES ──────────────────────────────────────┐        │    ║
+║   │       │                                        │        │    ║
+║   │      NO                                        │        │    ║
+║   │       │                                        │        │    ║
+║   │       ▼                                        │        │    ║
+║   │  • Generate UUID4 → Base62 → 7-char code       │        │    ║
+║   │  • Insert row into PostgreSQL                  │        │    ║
+║   │       │                                        │        │    ║
+║   │       └──────────────────┬─────────────────────┘        │    ║
+║   │                          ▼                              │    ║
+║   │  • Return { short_url, short_code, created_at }         │    ║
+║   └────────────────────────┬────────────────────────────────┘    ║
+║                            │                                      ║
+║        ③ 201 Created       │                                      ║
+║                            ▼                                      ║
+║   ┌─────────────────────────────────────────────────────────┐    ║
+║   │                  FRONTEND (index.html)                  │    ║
+║   │  • Displays short URL with copy button                  │    ║
+║   │  • Generates QR code (qrcodejs library)                 │    ║
+║   │  • Shows toast animation on copy                        │    ║
+║   │  • Adds entry to Recent Links table                     │    ║
+║   └────────────────────────┬────────────────────────────────┘    ║
+║                            │                                      ║
+║        ④ User shares / clicks short URL                          ║
+║                            │                                      ║
+║                            ▼                                      ║
+║   ┌─────────────────────────────────────────────────────────┐    ║
+║   │               FASTAPI — /{short_code}                   │    ║
+║   │                                                         │    ║
+║   │  • Lookup short_code in PostgreSQL (PK index → O(1))    │    ║
+║   │  • Not found? → Return 404                              │    ║
+║   │  • Found → Increment click_count                        │    ║
+║   │  • Return HTTP 302 → Location: long_url                 │    ║
+║   └────────────────────────┬────────────────────────────────┘    ║
+║                            │                                      ║
+║        ⑤ HTTP 302 Redirect │                                      ║
+║                            ▼                                      ║
+║   ┌─────────────────────────────────────────────────────────┐    ║
+║   │              DESTINATION WEBSITE                        │    ║
+║   │         User lands on the original URL                  │    ║
+║   └─────────────────────────────────────────────────────────┘    ║
+║                                                                   ║
+╚═══════════════════════════════════════════════════════════════════╝
+```
+
+---
+
+## Data Model
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                         TABLE: urls                              │
+├─────────────────┬──────────────┬──────────────────────────────── ┤
+│   Column        │   Type       │   Notes                         │
+├─────────────────┼──────────────┼─────────────────────────────────┤
+│ short_code      │ VARCHAR(7)   │ PRIMARY KEY — indexed, O(1)     │
+│                 │              │ lookup on every redirect         │
+├─────────────────┼──────────────┼─────────────────────────────────┤
+│ long_url        │ TEXT         │ Original URL, max 2048 chars     │
+├─────────────────┼──────────────┼─────────────────────────────────┤
+│ long_url_hash   │ VARCHAR(32)  │ MD5 of long_url — INDEX         │
+│                 │              │ used for deduplication checks    │
+├─────────────────┼──────────────┼─────────────────────────────────┤
+│ click_count     │ BIGINT       │ Incremented on every redirect    │
+│                 │              │ default: 0                       │
+├─────────────────┼──────────────┼─────────────────────────────────┤
+│ created_at      │ TIMESTAMP    │ Auto-set on insert (UTC)         │
+└─────────────────┴──────────────┴─────────────────────────────────┘
+
+Indexes:
+  ┌─────────────────────────────────────────────────────────────┐
+  │  INDEX 1 → PRIMARY KEY (short_code)                        │
+  │            Used on every GET /{code} redirect — O(1)       │
+  ├─────────────────────────────────────────────────────────────┤
+  │  INDEX 2 → long_url_hash                                   │
+  │            Used on every POST /shorten for dedup check     │
+  └─────────────────────────────────────────────────────────────┘
+
+ID Generation Pipeline:
+  ┌──────────┐    ┌──────────────┐    ┌─────────────┐    ┌────────┐
+  │  UUID4   │───▶│  .int        │───▶│   Base62    │───▶│  [:7]  │
+  │ 128-bit  │    │ large int    │    │   encode    │    │  code  │
+  └──────────┘    └──────────────┘    └─────────────┘    └────────┘
+  random UUID  →  integer value   →  62-char alphabet →  7 chars
+```
+
+---
+
 ## Tech Stack
 
 | Layer      | Technology            |
