@@ -54,6 +54,16 @@ def redirect_url(short_code: str, db: Session = Depends(get_db)):
     crud.increment_click(db, url)
     return RedirectResponse(url=url.long_url, status_code=302)
 
+@app.get("/stats/global")
+def global_stats(db: Session = Depends(get_db)):
+    from sqlalchemy import func
+    total_urls   = db.query(func.count(models.Url.short_code)).scalar()
+    total_clicks = db.query(func.sum(models.Url.click_count)).scalar()
+    return {
+        "total_urls":   total_urls   or 0,
+        "total_clicks": total_clicks or 0,
+    }
+
 
 
 #python -m uvicorn app.main:app --reload
