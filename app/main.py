@@ -9,7 +9,7 @@ from app import models, crud, schemas
 
 models.Base.metadata.create_all(bind=engine)
 
-BASE_URL = "http://127.0.0.1:8000"
+BASE_URL = "https://scurto.onrender.com"
 
 app = FastAPI(title="URL Shortener")
 
