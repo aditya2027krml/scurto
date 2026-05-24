@@ -288,6 +288,44 @@ scurto/
 └── README.md            ← You are here
 ```
 
+## Tests
+
+9 integration tests covering the full API — run with a single command.
+
+```bash
+python -m pytest tests/test_api.py -v
+```
+
+Expected output:
+
+```
+tests/test_api.py::test_health_check            PASSED
+tests/test_api.py::test_shorten_url             PASSED
+tests/test_api.py::test_shorten_invalid_url     PASSED
+tests/test_api.py::test_deduplication           PASSED
+tests/test_api.py::test_redirect                PASSED
+tests/test_api.py::test_click_count_increments  PASSED
+tests/test_api.py::test_stats_endpoint          PASSED
+tests/test_api.py::test_stats_not_found         PASSED
+tests/test_api.py::test_global_stats            PASSED
+
+9 passed in 1.67s
+```
+
+| Test                          | What it covers                               |
+| ----------------------------- | -------------------------------------------- |
+| `test_health_check`           | Server is running and responding             |
+| `test_shorten_url`            | Returns valid 7-char Base62 code             |
+| `test_shorten_invalid_url`    | Rejects invalid URLs with 422                |
+| `test_deduplication`          | Same long URL always returns same short code |
+| `test_redirect`               | Short code redirects with HTTP 302           |
+| `test_click_count_increments` | Click count increments correctly             |
+| `test_stats_endpoint`         | Stats returns correct data                   |
+| `test_stats_not_found`        | Non-existent code returns 404                |
+| `test_global_stats`           | Global URL and click counts work             |
+
+> Tests run against an isolated SQLite database — never touches production.
+
 ## Run Locally
 
 ```bash
